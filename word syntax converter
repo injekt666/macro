@@ -1,0 +1,566 @@
+Sub android2ios()
+
+'
+' inizio: disabilita update schermo e porta il cursore ad inizio documento
+'
+
+Application.ScreenUpdating = False
+
+Selection.WholeStory
+
+Options.AutoFormatAsYouTypeReplaceQuotes = False
+
+nLines = Selection.Range.ComputeStatistics(Statistic:=wdStatisticLines)
+
+'
+' input del namespace
+'
+
+Dim strName As String
+strName = InputBox("Inserire il namespace usato (es.: cdata, dataLayer...) e dopo l'invio attendere fino alla visualizzazione del pop-up. Verranno convertiti: context data, track state e track action.", "ANDROID -> iOS", "dataLayer")
+
+Selection.HomeKey Unit:=wdStory
+
+For x1 = 1 To nLines
+
+    '
+    ' controllo se la riga contiene il namespace e ".put(": se sì allora determino che è codice da convertire
+    '
+
+    Set myRange = ActiveDocument.Bookmarks("\Line").Range
+    
+    With myRange.Find
+        .Text = strName + ".put"
+        .Execute
+    End With
+    
+    If myRange.Find.Found = False Then GoTo avanti
+        
+        '
+        ' inserisce quadre
+        '
+        
+            Selection.HomeKey Unit:=wdLine
+            Selection.TypeText Text:="["
+            Selection.EndKey Unit:=wdLine
+            Selection.MoveLeft Unit:=wdCharacter, Count:=1
+            Selection.TypeText Text:="]"
+            Selection.HomeKey Unit:=wdLine
+        
+        '
+        ' toglie le parentesi e corregge la sintassi
+        '
+        
+        With ActiveDocument.Bookmarks("\Line").Range.Find
+            .ClearFormatting
+            .Replacement.ClearFormatting
+            .MatchWholeWord = False
+            .Execute FindText:="(", _
+                ReplaceWith:="", Replace:=wdReplaceAll
+        End With
+            
+        With ActiveDocument.Bookmarks("\Line").Range.Find
+            .ClearFormatting
+            .Replacement.ClearFormatting
+            .MatchWholeWord = False
+            .Execute FindText:=")", _
+                ReplaceWith:="", Replace:=wdReplaceAll
+        End With
+         
+        With ActiveDocument.Bookmarks("\Line").Range.Find
+            .ClearFormatting
+            .Replacement.ClearFormatting
+            .MatchWholeWord = False
+            .Execute FindText:=".put", _
+                ReplaceWith:=" setObject:@", Replace:=wdReplaceAll
+        End With
+        
+        With ActiveDocument.Bookmarks("\Line").Range.Find
+            .ClearFormatting
+            .Replacement.ClearFormatting
+            .MatchWholeWord = False
+            .Execute FindText:=", ", _
+                ReplaceWith:=" forKey:@", Replace:=wdReplaceAll
+        End With
+        
+        '
+        ' inizio linea
+        '
+        
+            Selection.HomeKey Unit:=wdLine
+        
+        '
+        ' taglio contenuto tra virgolette
+        '
+            
+            Selection.Find.ClearFormatting
+            With Selection.Find
+                .Text = Chr(34)
+                .Replacement.Text = ""
+                .Forward = True
+                .Wrap = wdFindContinue
+            End With
+            Selection.Find.Execute
+            Selection.Extend
+            Selection.Find.ClearFormatting
+            With Selection.Find
+                .Text = Chr(34)
+                .Replacement.Text = ""
+                .Forward = True
+                .Wrap = wdFindStop
+            End With
+            Selection.Find.Execute
+            Selection.Cut
+            
+        '
+        ' Inserisco Key
+        '
+        
+            Selection.HomeKey Unit:=wdLine
+            Selection.Find.ClearFormatting
+            With Selection.Find
+                .Text = "forKey:@"
+                .Replacement.Text = ""
+                .Forward = True
+                .Wrap = wdFindContinue
+            End With
+            Selection.Find.Execute
+            Selection.Collapse Direction:=wdCollapseEnd
+            Selection.Paste
+        
+        
+        '
+        ' taglio contenuto tra virgolette numero 2
+        '
+            
+            Selection.Find.ClearFormatting
+            With Selection.Find
+                .Text = Chr(34)
+                .Replacement.Text = ""
+                .Forward = True
+                .Wrap = wdFindContinue
+            End With
+            Selection.Find.Execute
+            Selection.Extend
+            Selection.Find.ClearFormatting
+            With Selection.Find
+                .Text = Chr(34)
+                .Replacement.Text = ""
+                .Forward = True
+                .Wrap = wdFindStop
+            End With
+            Selection.Find.Execute
+            Selection.Cut
+            
+        '
+        ' inserisco Object
+        '
+            Selection.HomeKey Unit:=wdLine
+            Selection.Find.ClearFormatting
+            With Selection.Find
+                .Text = "setObject:@"
+                .Replacement.Text = ""
+                .Forward = True
+                .Wrap = wdFindContinue
+                .Format = False
+                .MatchCase = False
+                .MatchWholeWord = False
+                .MatchWildcards = False
+                .MatchSoundsLike = False
+                .MatchAllWordForms = False
+            End With
+            Selection.Find.Execute
+            Selection.Collapse Direction:=wdCollapseEnd
+            Selection.Paste
+            
+avanti:
+            Selection.MoveDown Unit:=wdLine, Count:=1
+            Selection.HomeKey Unit:=wdLine
+            
+Next x1
+
+'
+' da Hashmap a NSMutableDictionary
+'
+
+Selection.HomeKey Unit:=wdStory
+
+    With Selection.Find
+        .Text = "HashMap<String, Object> " + strName + " = new HashMap<String, Object>();"
+        .Replacement.Text = "NSMutableDictionary *" + strName + " = [NSMutableDictionary dictionary];"
+        .Forward = True
+        .Wrap = wdFindContinue
+        .Format = False
+        .MatchCase = False
+        .MatchWholeWord = False
+        .MatchWildcards = False
+        .MatchSoundsLike = False
+        .MatchAllWordForms = False
+    End With
+
+    Selection.Find.Execute Replace:=wdReplaceAll
+    
+'
+' corregge la sintassi del TrackState
+'
+
+    Selection.HomeKey Unit:=wdStory
+
+    With Selection.Find
+        .Text = "Analytics.trackState("
+        .Replacement.Text = "[ADBMobile trackState:@"
+        .Forward = True
+        .Wrap = wdFindContinue
+        .Format = False
+        .MatchCase = False
+        .MatchWholeWord = False
+        .MatchWildcards = False
+        .MatchSoundsLike = False
+        .MatchAllWordForms = False
+    End With
+    
+    Selection.Find.Execute Replace:=wdReplaceAll
+    
+    With Selection.Find
+        .Text = ", " + strName + ");"
+        .Replacement.Text = " data:" + strName + "];"
+        .Forward = True
+        .Wrap = wdFindContinue
+        .Format = False
+        .MatchCase = False
+        .MatchWholeWord = False
+        .MatchWildcards = False
+        .MatchSoundsLike = False
+        .MatchAllWordForms = False
+    End With
+    Selection.Find.Execute Replace:=wdReplaceAll
+
+'
+' corregge la sintassi del TrackAction
+'
+
+Selection.HomeKey Unit:=wdStory
+
+    With Selection.Find
+        .Text = "Analytics.trackAction("
+        .Replacement.Text = "[ADBMobile trackAction:@"
+        .Forward = True
+        .Wrap = wdFindContinue
+        .Format = False
+        .MatchCase = False
+        .MatchWholeWord = False
+        .MatchWildcards = False
+        .MatchSoundsLike = False
+        .MatchAllWordForms = False
+    End With
+    Selection.Find.Execute Replace:=wdReplaceAll
+    
+    With Selection.Find
+        .Text = ", " + strName + ");"
+        .Replacement.Text = " data:" + strName + "];"
+        .Forward = True
+        .Wrap = wdFindContinue
+        .Format = False
+        .MatchCase = False
+        .MatchWholeWord = False
+        .MatchWildcards = False
+        .MatchSoundsLike = False
+        .MatchAllWordForms = False
+    End With
+    Selection.Find.Execute Replace:=wdReplaceAll
+
+    With Selection.Find
+        .Text = ":@ " + Chr(34)
+        .Replacement.Text = ":@" + Chr(34)
+        .Forward = True
+        .Wrap = wdFindContinue
+        .Format = False
+        .MatchCase = False
+        .MatchWholeWord = False
+        .MatchWildcards = False
+        .MatchSoundsLike = False
+        .MatchAllWordForms = False
+    End With
+    Selection.Find.Execute Replace:=wdReplaceAll
+
+'
+' visualizza i risultati della macro
+'
+
+Application.ScreenUpdating = True
+MsgBox "Sostituzione eseguita! :)"
+
+End Sub
+
+Sub ios2android()
+
+'
+' inizio: disabilita update schermo e porta il cursore ad inizio documento
+'
+
+Application.ScreenUpdating = False
+
+Selection.WholeStory
+
+Options.AutoFormatAsYouTypeReplaceQuotes = False
+
+nLines = Selection.Range.ComputeStatistics(Statistic:=wdStatisticLines)
+
+'
+' input del namespace
+'
+
+Dim strName As String
+strName = InputBox("Inserire il namespace usato (es.: cdata, dataLayer...) e dopo l'invio attendere fino alla visualizzazione del pop-up. Verranno convertiti: context data, track state e track action.", "iOS -> ANDROID", "dataLayer")
+
+Selection.HomeKey Unit:=wdStory
+
+For x1 = 1 To nLines
+
+    '
+    ' controllo se la riga contiene il namespace e " setObject:@": se sì allora determino che è codice da convertire
+    '
+
+    Set myRange = ActiveDocument.Bookmarks("\Line").Range
+    
+    With myRange.Find
+        .Text = strName + " setObject:@"
+        .Execute
+    End With
+    
+    If myRange.Find.Found = False Then GoTo avanti
+        
+        '
+        ' sistema ultima quadra
+        '
+        
+            
+        With ActiveDocument.Bookmarks("\Line").Range.Find
+            .ClearFormatting
+            .Replacement.ClearFormatting
+            .MatchWholeWord = False
+            .Execute FindText:="];", _
+                ReplaceWith:=");", Replace:=wdReplaceAll
+        End With
+        
+        '
+        ' corregge la sintassi
+        '
+        
+        With ActiveDocument.Bookmarks("\Line").Range.Find
+            .ClearFormatting
+            .Replacement.ClearFormatting
+            .MatchWholeWord = False
+            .Execute FindText:="[cdata setObject:@", _
+                ReplaceWith:="cdata.put(", Replace:=wdReplaceAll
+        End With
+        
+        With ActiveDocument.Bookmarks("\Line").Range.Find
+            .ClearFormatting
+            .Replacement.ClearFormatting
+            .MatchWholeWord = False
+            .Execute FindText:=" forKey:@", _
+                ReplaceWith:="", Replace:=wdReplaceAll
+        End With
+        
+        '
+        ' inizio linea
+        '
+        
+            Selection.HomeKey Unit:=wdLine
+        
+        '
+        ' taglio contenuto tra virgolette
+        '
+            
+            Selection.Find.ClearFormatting
+            With Selection.Find
+                .Text = Chr(34)
+                .Replacement.Text = ""
+                .Forward = True
+                .Wrap = wdFindContinue
+            End With
+            Selection.Find.Execute
+            Selection.Extend
+            Selection.Find.ClearFormatting
+            With Selection.Find
+                .Text = Chr(34)
+                .Replacement.Text = ""
+                .Forward = True
+                .Wrap = wdFindStop
+            End With
+            Selection.Find.Execute
+            Selection.Cut
+            Selection.EndKey Unit:=wdLine
+            Selection.MoveLeft Unit:=wdCharacter, Count:=2
+            Selection.Paste
+            
+'
+' separo i valori con una virgola
+'
+
+            With ActiveDocument.Bookmarks("\Line").Range.Find
+                .ClearFormatting
+                .Replacement.ClearFormatting
+                .MatchWholeWord = False
+                .Execute FindText:=Chr(34) + Chr(34), _
+                    ReplaceWith:=Chr(34) + ", " + Chr(34), Replace:=wdReplaceAll
+            End With
+avanti:
+            Selection.MoveDown Unit:=wdLine, Count:=1
+            Selection.HomeKey Unit:=wdLine
+            
+Next x1
+
+'
+' da NSMutableDictionary a Hashmap
+'
+
+Selection.HomeKey Unit:=wdStory
+
+    With Selection.Find
+        .Text = "NSMutableDictionary *" + strName + " = [NSMutableDictionary dictionary];"
+        .Replacement.Text = "HashMap<String, Object> " + strName + " = new HashMap<String, Object>();"
+        .Forward = True
+        .Wrap = wdFindContinue
+        .Format = False
+        .MatchCase = False
+        .MatchWholeWord = False
+        .MatchWildcards = False
+        .MatchSoundsLike = False
+        .MatchAllWordForms = False
+    End With
+
+    Selection.Find.Execute Replace:=wdReplaceAll
+    
+'
+' corregge la sintassi del TrackState
+'
+
+    Selection.HomeKey Unit:=wdStory
+
+    With Selection.Find
+        .Text = "[ADBMobile trackState:@"
+        .Replacement.Text = "Analytics.trackState("
+        .Forward = True
+        .Wrap = wdFindContinue
+        .Format = False
+        .MatchCase = False
+        .MatchWholeWord = False
+        .MatchWildcards = False
+        .MatchSoundsLike = False
+        .MatchAllWordForms = False
+    End With
+    
+    Selection.Find.Execute Replace:=wdReplaceAll
+    
+    With Selection.Find
+        .Text = " data:" + strName + "];"
+        .Replacement.Text = ", " + strName + ");"
+        .Forward = True
+        .Wrap = wdFindContinue
+        .Format = False
+        .MatchCase = False
+        .MatchWholeWord = False
+        .MatchWildcards = False
+        .MatchSoundsLike = False
+        .MatchAllWordForms = False
+    End With
+    Selection.Find.Execute Replace:=wdReplaceAll
+
+'
+' corregge la sintassi del TrackAction
+'
+
+Selection.HomeKey Unit:=wdStory
+
+    With Selection.Find
+        .Text = "[ADBMobile trackAction:@"
+        .Replacement.Text = "Analytics.trackAction("
+        .Forward = True
+        .Wrap = wdFindContinue
+        .Format = False
+        .MatchCase = False
+        .MatchWholeWord = False
+        .MatchWildcards = False
+        .MatchSoundsLike = False
+        .MatchAllWordForms = False
+    End With
+    Selection.Find.Execute Replace:=wdReplaceAll
+    
+    With Selection.Find
+        .Text = " data:" + strName + "];"
+        .Replacement.Text = ", " + strName + ");"
+        .Forward = True
+        .Wrap = wdFindContinue
+        .Format = False
+        .MatchCase = False
+        .MatchWholeWord = False
+        .MatchWildcards = False
+        .MatchSoundsLike = False
+        .MatchAllWordForms = False
+    End With
+    Selection.Find.Execute Replace:=wdReplaceAll
+
+'
+' visualizza i risultati della macro
+'
+
+Application.ScreenUpdating = True
+MsgBox "Sostituzione eseguita! :)"
+
+End Sub
+
+Sub resetios()
+'
+' reset Macro
+'
+'
+    Selection.WholeStory
+    Selection.Delete Unit:=wdCharacter, Count:=1
+    Selection.TypeText Text:="NSMutableDictionary *cdata = [NSMutableDictionary dictionary];"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="[cdata setObject:@" + Chr(34) + "primo" + Chr(34) + " forKey:@ " + Chr(34) + "secondo" + Chr(34) + "];"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="[cdata setObject:@" + Chr(34) + "primo" + Chr(34) + " forKey:@ " + Chr(34) + "secondo" + Chr(34) + "];"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="riga non di codice"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="[cdata setObject:@" + Chr(34) + "primo" + Chr(34) + " forKey:@ " + Chr(34) + "secondo" + Chr(34) + "];"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="[ADBMobile trackState:@" + Chr(34) + "homepage" + Chr(34) + " data:cdata];"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="[ADBMobile trackState:@" + Chr(34) + "homepage" + Chr(34) + " data:cdata];"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="riga non di codice"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="[ADBMobile trackAction:@" + Chr(34) + "c1t:[CITTA]:entertainment:[CATEGORIA]:[NOME DETTAGLIO]" + Chr(34) + " data:cdata];"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="riga non di codice"
+End Sub
+
+Sub resetandroid()
+'
+' reset Macro
+'
+'
+    Selection.WholeStory
+    Selection.Delete Unit:=wdCharacter, Count:=1
+    Selection.TypeText Text:="cdata.put(" + Chr(34) + "c1t.sezione" + Chr(34) + ", " + Chr(34) + "registrazione" + Chr(34) + ");"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="cdata.put(" + Chr(34) + "c1t.sezione" + Chr(34) + ", " + Chr(34) + "registrazione" + Chr(34) + ");"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="riga non di codice"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="cdata.put(" + Chr(34) + "c1t.sezione" + Chr(34) + ", " + Chr(34) + "registrazione" + Chr(34) + ");"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="Analytics.trackState(" + Chr(34) + "homepage" + Chr(34) + ", cdata);"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="Analytics.trackState(" + Chr(34) + "homepage" + Chr(34) + ", cdata);"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="riga non di codice"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="Analytics.trackAction(" + Chr(34) + "c1t:[CITTA]:entertainment:[CATEGORIA]:[NOME DETTAGLIO]" + Chr(34) + ", cdata);"
+    Selection.TypeParagraph
+    Selection.TypeText Text:="riga non di codice"
+End Sub
