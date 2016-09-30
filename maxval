@@ -1,0 +1,32 @@
+Sub contaValori()
+
+Dim numrighe As Integer
+Dim startCall As Integer
+Dim maxval As Integer
+
+Application.ScreenUpdating = False
+
+maxval = 1
+numrighe = ActiveSheet.UsedRange.Rows.Count
+
+For i = 2 To numrighe
+    
+    If Range("A" & i) <> Range("A" & (i + 1)) Then
+      Range("C" & i).Value = maxval
+      maxval = 1
+    Else
+        Range("C" & i).Value = ""
+
+        If Range("B" & i) <> Range("B" & (i + 1)) Then
+            maxval = (maxval + 1)
+        End If
+    
+    End If
+
+Next i
+
+Application.ScreenUpdating = True
+
+MsgBox "Esecuzione terminata"
+
+End Sub
