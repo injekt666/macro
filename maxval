@@ -1,7 +1,6 @@
 Sub contaValori()
 
 Dim numrighe As Integer
-Dim startCall As Integer
 Dim maxval As Integer
 
 Application.ScreenUpdating = False
