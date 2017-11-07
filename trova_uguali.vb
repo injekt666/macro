@@ -8,8 +8,8 @@ Sub trovaUguali()
     
     For x = 1 To numRighe
         For y = 1 To numRighe
-            If Range("A" & i).Value = Range("B" & y).Value Then
-                Range("C" & i).Value = "trovato"
+            If Range("A" & x).Value = Range("B" & y).Value Then
+                Range("C" & x).Value = "trovato"
             End If
         Next y
     Next x
